@@ -10,7 +10,8 @@ class Directory(object):
         self.virtual = virtual
 
 class DirectoryStack(object):
-    def __init__(self):
+    def __init__(self, output):
+        self.output = output
         self._dirs = [Directory('.')]
     def push(self, real, virtual=None):
         self._dirs.append(Directory(real, virtual))
@@ -21,7 +22,9 @@ class DirectoryStack(object):
         return path.normpath(path.join(*[d.virtual for d in self._dirs]))
     def get_current_real(self):
         return path.join(*[d.real for d in self._dirs])
-    def join_virtual(self, pre='.', post='.'):
-        return path.normpath(path.join(pre, self.get_current_virtual(), post))
+    def join_virtual(self, *elms):
+        return path.normpath(path.join(self.get_current_virtual(), *elms))
     def join_real(self, *elms):
         return path.join(self.get_current_real(), *elms)
+    def get_output(self, *elms):
+        return path.join(self.output, self.get_current_virtual(), *elms)

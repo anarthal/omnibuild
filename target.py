@@ -15,64 +15,57 @@ class Target(object):
 
 
 class ObjectFile(Target):
-    def __init__(self, src, output, compiler):
-        Target.__init__(self, output)
+    def __init__(self, src, dirstack, compiler):
+        Target.__init__(self, dirstack.get_output('obj', src + '.o'))
         self.src = src
-        self.output = output
+        self.full_src = dirstack.join_real(src)
         self.compiler = compiler
-        if not os.path.isfile(src):
-            raise FileNotFoundError('Source file {} does not exist'.format(src))
-        self.includes = self.compiler.get_includes(self.src)
+        self.output = self.name
+        if not os.path.isfile(self.full_src):
+            raise FileNotFoundError('Source file {} does not exist'.format(self.full_src))
+        self.includes = self.compiler.get_includes(self.full_src)
     def is_up_to_date(self, cache):
-        if cache.file_has_changed(self.src):
+        if cache.file_has_changed(self.full_src):
             return False
         for inc in self.includes:
             if cache.file_has_changed(inc):
                 return False
         return not cache.file_has_changed(self.output)
     def build(self):
-        self.compiler.compile(self.src, self.output)
+        self.compiler.compile(self.full_src, self.output)
     def update_cache(self, cache):
-        to_store = [self.src] + self.includes + [self.output]
+        to_store = [self.full_src] + self.includes + [self.output]
         for fname in to_store:
             cache.file_store(fname)
 
 class CppTarget(Target):
-    def __init__(self, name, sources, output_dir, compiler):
-        Target.__init__(self, name)
+    def __init__(self, name, sources, dirstack, compiler):
+        Target.__init__(self, dirstack.join_virtual(name))
         self.sources = sources
-        self.output_dir = output_dir
-        self.output_file = self._get_output_file()
+        self.output_file = self._get_output_file(name, dirstack)
         self.compiler = compiler
-        self.objects = [self.make_object_file(src, output_dir, compiler) for src in sources]
+        self.objects = [ObjectFile(src, dirstack, compiler) for src in sources]
         self.libs = []
         self.depends = list(self.objects)
-        print('Name: {}, output_file: {}'.format(self.name, self.output_dir))
-    def get_path(self):
-        return self.output_file
     def is_up_to_date(self, cache):
-        return not cache.file_has_changed(self.get_path())
+        return not cache.file_has_changed(self.output_file)
     def update_cache(self, cache):
-        cache.file_store(self.get_path())
+        cache.file_store(self.output_file)
     def link_libraries(self, libs):
         self.libs += libs
         self.depends += libs
 
     def _get_link_inputs(self):
-        return [obj.output for obj in self.objects] + [lib.get_path() for lib in self.libs]
-    def _get_output_file(self):
-        return os.path.join(self.output_dir, 'bin', os.path.basename(self.name))
-
-    @staticmethod
-    def make_object_file(src, output_dir, compiler):
-        return ObjectFile(src, os.path.join(output_dir, 'obj', src + '.o'), compiler)
+        return [obj.output for obj in self.objects] + [lib.output_file for lib in self.libs]
+    def _get_output_file(self, name, dirstack):
+        return dirstack.get_output('bin', name)
 
 class Executable(CppTarget):
     def build(self):
-        self.compiler.link_executable(self._get_link_inputs(), self.get_path())
+        self.compiler.link_executable(self._get_link_inputs(), self.output_file)
 
 class DynamicLibrary(CppTarget):
     def build(self):
-        self.compiler.link_dynamic_library(self._get_link_inputs(), self.get_path())
-    def _get_output_file(self):
-        return os.path.join(self.output_dir, 'bin', os.path.basename(self.name + '.so'))
+        self.compiler.link_dynamic_library(self._get_link_inputs(), self.output_file)
+    def _get_output_file(self, name, dirstack):
+        return dirstack.get_output('bin', name +'.so')
