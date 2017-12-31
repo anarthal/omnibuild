@@ -39,7 +39,7 @@ class ObjectFile(Target):
 
 class CppTarget(Target):
     def __init__(self, name, sources, output_dir, compiler):
-        Target.__init__(self, os.path.join(output_dir, 'targets', name))
+        Target.__init__(self, os.path.join(output_dir, 'bin', name))
         self.sources = sources
         self.output_dir = output_dir
         self.compiler = compiler
@@ -61,7 +61,7 @@ class CppTarget(Target):
 
     @staticmethod
     def make_object_file(src, output_dir, compiler):
-        return ObjectFile(src, os.path.join(output_dir, src + '.o'), compiler)
+        return ObjectFile(src, os.path.join(output_dir, 'obj', src + '.o'), compiler)
 
 class Executable(CppTarget):
     def build(self):

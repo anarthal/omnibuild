@@ -3,29 +3,34 @@ import target
 import networkx as nx
 import cache
 import os.path
+import importlib
 
 class Build(object):
     def __init__(self, output, compiler):
+        self.current_dir = '.'
         self.targets = {}
         self.output = output
         self.compiler = compiler
         self.cache = cache.Cache()
         self.cache.load(self._cache_path())
+    
     def add_target(self, elm):
         print('Adding target {}'.format(elm.name))
         self.targets[elm.name] = elm
     def add_executable(self, name, srcs):
-        exe = target.Executable(name, srcs, self.output, self.compiler)
-        self.add_target(exe)
-        for obj in exe.objects:
-            self.add_target(obj)
-        return exe
+        return self._add_cpp_target(name, srcs, target.Executable)
     def add_dynamic_library(self, name, srcs):
-        lib = target.DynamicLibrary(name, srcs, self.output, self.compiler)
-        self.add_target(lib)
-        for obj in lib.objects:
-            self.add_target(obj)
-        return lib
+        return self._add_cpp_target(name, srcs, target.DynamicLibrary)
+    def add_subdirectory(self, directory, script='configure.py'):
+        old_dir = self.current_dir
+        self.current_dir = os.path.join(self.current_dir, directory)
+        script_path = os.path.join(self.current_dir, script)
+        if not os.path.isfile(script_path):
+            raise FileNotFoundError('Unable to find configure script ' + script_path)
+        loader = importlib.machinery.SourceFileLoader('configure', script_path)
+        module = loader.load_module('configure')
+        module.configure(self)
+        self.current_dir = old_dir
 
     def make_build_graph(self, target):
         return BuildGraph(self.targets, target, self.cache)
@@ -34,9 +39,17 @@ class Build(object):
         self.make_build_graph(target).build()
         self.cache.dump(self._cache_path())
 
-    
+    def _add_cpp_target(self, name, srcs, target_class):
+        actual_srcs = [os.path.join(self.current_dir, src) for src in srcs]
+        target = target_class(name, actual_srcs, self._current_output(), self.compiler)
+        self.add_target(target)
+        for obj in target.objects:
+            self.add_target(obj)
+        return target
     def _cache_path(self):
         return os.path.join(self.output, '__omnibuild_cache.dat')
+    def _current_output(self):
+        return os.path.normpath(os.path.join(self.output, self.current_dir))
 
 
 
