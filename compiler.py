@@ -10,8 +10,11 @@ class Compiler(object):
         output = subprocess.check_output(args).decode('ascii')
         res = output.replace('\\\n', ' ').replace('\n', ' ').split(' ')[2:]
         return list(filter(bool, res))
-    def compile(self, src, output):
-        args = [self.exe, '-c', '-fpic', '-o', output] + self.flags + [src]
+    def compile(self, src, output, includes):
+        include_flags = []
+        for inc in includes:
+            include_flags += ['-I', inc]
+        args = [self.exe, '-c', '-fpic', '-o', output] + include_flags + self.flags + [src]
         print('Building C++ source file {}'.format(src))
         self.make_containing_folder(output)
         subprocess.check_call(args)
