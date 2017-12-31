@@ -6,6 +6,6 @@ def main():
     b = build.Build('output', c)
     b.add_subdirectory('mylib')
     b.add_subdirectory('myexe')
-    b.build('output/myexe/bin/myexe')
+    b.build('myexe/myexe')
 
 main()

@@ -1,13 +1,15 @@
 
 import target
-import networkx as nx
 import cache
+from directory_stack import DirectoryStack
+
+import networkx as nx
 import os.path
 import importlib
 
 class Build(object):
     def __init__(self, output, compiler):
-        self.current_dir = '.'
+        self.dirstack = DirectoryStack()
         self.targets = {}
         self.output = output
         self.compiler = compiler
@@ -22,15 +24,14 @@ class Build(object):
     def add_dynamic_library(self, name, srcs):
         return self._add_cpp_target(name, srcs, target.DynamicLibrary)
     def add_subdirectory(self, directory, script='configure.py'):
-        old_dir = self.current_dir
-        self.current_dir = os.path.join(self.current_dir, directory)
-        script_path = os.path.join(self.current_dir, script)
+        self.dirstack.push(directory)
+        script_path = self.dirstack.join_real(script)
         if not os.path.isfile(script_path):
             raise FileNotFoundError('Unable to find configure script ' + script_path)
         loader = importlib.machinery.SourceFileLoader('configure', script_path)
         module = loader.load_module('configure')
         module.configure(self)
-        self.current_dir = old_dir
+        self.dirstack.pop()
 
     def make_build_graph(self, target):
         return BuildGraph(self.targets, target, self.cache)
@@ -40,16 +41,16 @@ class Build(object):
         self.cache.dump(self._cache_path())
 
     def _add_cpp_target(self, name, srcs, target_class):
-        actual_srcs = [os.path.join(self.current_dir, src) for src in srcs]
-        target = target_class(name, actual_srcs, self._current_output(), self.compiler)
+        actual_srcs = [self.dirstack.join_real(src) for src in srcs]
+        actual_name = self.dirstack.join_virtual(post=name)
+        actual_output = self.dirstack.join_virtual(pre=self.output)
+        target = target_class(actual_name, actual_srcs, actual_output, self.compiler)
         self.add_target(target)
         for obj in target.objects:
             self.add_target(obj)
         return target
     def _cache_path(self):
         return os.path.join(self.output, '__omnibuild_cache.dat')
-    def _current_output(self):
-        return os.path.normpath(os.path.join(self.output, self.current_dir))
 
 
 

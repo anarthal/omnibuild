@@ -11,14 +11,11 @@ class Cache(object):
         with open(fname, 'wb') as f:
             pickle.dump(self.values, f)
     def file_has_changed(self, fname):
-        #print('Checking if {} is up to date'.format(fname))
         md5 = self._try_get_md5(fname)
         if md5 != self.values.get(fname, None):
-            #print('  Has changed')
             self.values[fname] = md5
             return True
         else:
-            #print('  Unchanged')
             return False
     def file_store(self, fname):
         self.values[fname] = self._try_get_md5(fname)
