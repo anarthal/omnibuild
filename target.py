@@ -52,8 +52,11 @@ class CppTarget(Target):
     def update_cache(self, cache):
         cache.file_store(self.output_file)
     def link_libraries(self, libs):
-        self.libs += libs
-        self.depends += libs
+        to_add = libs
+        for lib in libs:
+            to_add += lib.libs
+        self.libs += to_add
+        self.depends += to_add
 
     def _get_link_inputs(self):
         return [obj.output for obj in self.objects] + [lib.output_file for lib in self.libs]
